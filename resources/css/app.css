@@ -5,7 +5,261 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — CSS Custom Properties
+   Paleta WCAG AA: contraste ≥ 4.5:1 para texto normal, ≥ 3:1 para texto grande
+   ═══════════════════════════════════════════════════════════════════════════════ */
+:root {
+    /* Cores estruturais — tema claro */
+    --bg:           #f9fafb;   /* gray-50  — fundo de página          */
+    --surface:      #ffffff;   /* white    — cards / painéis          */
+    --surface-alt:  #f3f4f6;   /* gray-100 — superfícies secundárias  */
+    --surface-alt2: #e5e7eb;   /* gray-200 — hover states             */
+
+    /* Texto */
+    --text:         #111827;   /* gray-900 — título principal  (16.1:1 sobre branco) */
+    --text-secondary:#374151;  /* gray-700 — texto corrido     (10.7:1)              */
+    --text-muted:   #6b7280;   /* gray-500 — legenda / hint    ( 4.6:1)              */
+    --text-subtle:  #9ca3af;   /* gray-400 — placeholder       ( 3.1:1 — large text) */
+
+    /* Bordas */
+    --border:       #d1d5db;   /* gray-300 */
+    --border-subtle:#e5e7eb;   /* gray-200 */
+    --border-faint: #f3f4f6;   /* gray-100 */
+
+    /* Marca */
+    --primary:      #f97316;   /* orange-500 */
+    --primary-hover:#ea580c;   /* orange-600 */
+    --primary-light:#fff7ed;   /* orange-50  */
+
+    /* Semântico */
+    --success-bg:   #f0fdf4;
+    --success-text: #166534;
+    --success-border:#bbf7d0;
+    --warning-bg:   #fffbeb;
+    --warning-text: #92400e;
+    --warning-border:#fde68a;
+    --error-bg:     #fef2f2;
+    --error-text:   #991b1b;
+    --error-border: #fca5a5;
+    --info-bg:      #eff6ff;
+    --info-text:    #1e40af;
+    --info-border:  #bfdbfe;
+
+    color-scheme: light;
+}
+
+html.dark {
+    /* Cores estruturais — tema escuro (baseado em Slate) */
+    --bg:           #0f172a;   /* slate-900 — fundo de página         */
+    --surface:      #1e293b;   /* slate-800 — cards / painéis         */
+    --surface-alt:  #334155;   /* slate-700 — superfícies secundárias  */
+    --surface-alt2: #475569;   /* slate-600 — hover states             */
+
+    /* Texto */
+    --text:         #f1f5f9;   /* slate-100 — título principal  (16.3:1 sobre slate-800) */
+    --text-secondary:#cbd5e1;  /* slate-300 — texto corrido     ( 9.9:1)                 */
+    --text-muted:   #94a3b8;   /* slate-400 — legenda           ( 5.1:1)                 */
+    --text-subtle:  #64748b;   /* slate-500 — placeholder       ( 3.2:1 — large text)    */
+
+    /* Bordas */
+    --border:       #475569;   /* slate-600 */
+    --border-subtle:#334155;   /* slate-700 */
+    --border-faint: #1e293b;   /* slate-800 */
+
+    /* Marca — mantida idêntica para consistência de branding */
+    --primary:      #f97316;
+    --primary-hover:#ea580c;
+    --primary-light:rgba(249,115,22,0.12);
+
+    /* Semântico */
+    --success-bg:   rgba(21,128,61,0.15);
+    --success-text: #86efac;   /* green-300 — 4.8:1 sobre slate-800 */
+    --success-border:rgba(34,197,94,0.3);
+    --warning-bg:   rgba(161,98,7,0.15);
+    --warning-text: #fcd34d;   /* yellow-300 — 6.2:1 */
+    --warning-border:rgba(251,191,36,0.3);
+    --error-bg:     rgba(185,28,28,0.15);
+    --error-text:   #fca5a5;   /* red-300 — 4.9:1 */
+    --error-border: rgba(239,68,68,0.3);
+    --info-bg:      rgba(37,99,235,0.15);
+    --info-text:    #93c5fd;   /* blue-300 — 5.3:1 */
+    --info-border:  rgba(96,165,250,0.3);
+
+    color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   TAILWIND v4 — Tema & Fontes
+   ═══════════════════════════════════════════════════════════════════════════════ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Cores de marca disponíveis como classes Tailwind: bg-brand-500, text-brand-600 … */
+    --color-brand-50:  #fff7ed;
+    --color-brand-100: #ffeed5;
+    --color-brand-500: #f97316;
+    --color-brand-600: #ea6c0a;
+    --color-brand-700: #c2570a;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   DARK MODE — Overrides de utility classes do Tailwind
+   Estratégia: sobrescrever cada classe com alta especificidade via `html.dark`,
+   sem precisar alterar o markup dos Blade existentes.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Fundo de página ──────────────────────────────────────────────────────── */
+html.dark body             { background-color: var(--bg) !important; color: var(--text); }
+html.dark .bg-gray-50      { background-color: var(--bg) !important; }
+html.dark .bg-gray-100     { background-color: var(--surface-alt) !important; }
+html.dark .bg-gray-200     { background-color: var(--surface-alt2) !important; }
+
+/* ── Cards / superfícies ─────────────────────────────────────────────────── */
+html.dark .bg-white        { background-color: var(--surface) !important; }
+
+/* ── Texto ───────────────────────────────────────────────────────────────── */
+html.dark .text-gray-900   { color: var(--text) !important; }
+html.dark .text-gray-800   { color: var(--text) !important; }
+html.dark .text-gray-700   { color: var(--text-secondary) !important; }
+html.dark .text-gray-600   { color: var(--text-muted) !important; }
+html.dark .text-gray-500   { color: var(--text-muted) !important; }
+html.dark .text-gray-400   { color: var(--text-subtle) !important; }
+
+/* ── Bordas ──────────────────────────────────────────────────────────────── */
+html.dark .border-gray-100 { border-color: var(--border-faint) !important; }
+html.dark .border-gray-200 { border-color: var(--border-subtle) !important; }
+html.dark .border-gray-300 { border-color: var(--border) !important; }
+
+/* ── Divisórias (divide-*) ───────────────────────────────────────────────── */
+html.dark .divide-gray-50  > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--border-faint) !important;
+}
+
+/* ── Tabelas ─────────────────────────────────────────────────────────────── */
+html.dark thead,
+html.dark .bg-gray-50.text-xs { background-color: var(--surface-alt) !important; }
+
+/* ── Formulários ─────────────────────────────────────────────────────────── */
+html.dark input,
+html.dark select,
+html.dark textarea {
+    background-color: var(--surface) !important;
+    color:            var(--text) !important;
+    border-color:     var(--border) !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: var(--text-subtle) !important; }
+
+/* date input — ícone nativo */
+html.dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
+
+/* datalist autocomplete */
+html.dark datalist option { background-color: var(--surface); color: var(--text); }
+
+/* ── Botões secundários (border/gray) ────────────────────────────────────── */
+html.dark .border.border-gray-200.text-gray-600 {
+    border-color: var(--border) !important;
+    color: var(--text-muted) !important;
+}
+html.dark .hover\:bg-gray-50:hover  { background-color: var(--surface-alt) !important; }
+html.dark .hover\:bg-gray-100:hover { background-color: var(--surface-alt) !important; }
+html.dark .hover\:bg-gray-200:hover { background-color: var(--surface-alt2) !important; }
+html.dark .bg-gray-100.hover\:bg-gray-200 {
+    background-color: var(--surface-alt) !important;
+}
+
+/* ── Alertas / notificações ──────────────────────────────────────────────── */
+html.dark .bg-green-100,
+html.dark .bg-green-50  {
+    background-color: var(--success-bg) !important;
+    border-color:     var(--success-border) !important;
+    color:            var(--success-text) !important;
+}
+html.dark .text-green-800,
+html.dark .text-green-700 { color: var(--success-text) !important; }
+html.dark .border-green-400,
+html.dark .border-green-300 { border-color: var(--success-border) !important; }
+
+html.dark .bg-yellow-50  {
+    background-color: var(--warning-bg) !important;
+    border-color:     var(--warning-border) !important;
+    color:            var(--warning-text) !important;
+}
+html.dark .text-yellow-800,
+html.dark .text-yellow-700 { color: var(--warning-text) !important; }
+html.dark .bg-yellow-100   { background-color: rgba(161,98,7,0.2) !important; }
+html.dark .text-yellow-700   { color: #fde68a !important; }
+html.dark .border-yellow-300 { border-color: var(--warning-border) !important; }
+
+html.dark .bg-red-50,
+html.dark .bg-red-100 {
+    background-color: var(--error-bg) !important;
+    border-color:     var(--error-border) !important;
+    color:            var(--error-text) !important;
+}
+html.dark .text-red-800,
+html.dark .text-red-700 { color: var(--error-text) !important; }
+html.dark .border-red-400,
+html.dark .border-red-300 { border-color: var(--error-border) !important; }
+
+/* campo com erro de validação */
+html.dark .border-red-400 { border-color: #f87171 !important; }
+html.dark .text-red-500   { color: #fca5a5 !important; }
+
+html.dark .bg-blue-50  { background-color: var(--info-bg) !important; }
+html.dark .text-blue-700 { color: var(--info-text) !important; }
+html.dark .border-blue-300 { border-color: var(--info-border) !important; }
+
+/* ── Badges de status ────────────────────────────────────────────────────── */
+html.dark .bg-green-100.text-green-800 { background-color: rgba(21,128,61,0.2) !important; color: #86efac !important; }
+html.dark .bg-yellow-100.text-yellow-800 { background-color: rgba(161,98,7,0.2) !important; color: #fcd34d !important; }
+html.dark .bg-red-100.text-red-800 { background-color: rgba(185,28,28,0.2) !important; color: #fca5a5 !important; }
+html.dark .bg-gray-100.text-gray-600 { background-color: var(--surface-alt) !important; color: var(--text-muted) !important; }
+
+/* ── Área de imagem vazia (brand-50) ─────────────────────────────────────── */
+html.dark .bg-brand-50 { background-color: var(--primary-light) !important; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+html.dark footer,
+html.dark .bg-gray-800  { background-color: #020617 !important; }  /* slate-950 */
+html.dark .text-gray-400 { color: var(--text-subtle) !important; }
+
+/* ── Paginação ───────────────────────────────────────────────────────────── */
+html.dark nav[role="navigation"] span,
+html.dark nav[role="navigation"] a {
+    background-color: var(--surface) !important;
+    border-color:     var(--border) !important;
+    color:            var(--text-muted) !important;
+}
+html.dark nav[role="navigation"] [aria-current="page"] span {
+    background-color: var(--primary) !important;
+    border-color:     var(--primary) !important;
+    color:            #fff !important;
+}
+
+/* ── Scrollbar (Chromium) ────────────────────────────────────────────────── */
+html.dark { scrollbar-color: #334155 #0f172a; scroll-behavior: smooth; }
+html.dark ::-webkit-scrollbar        { width: 8px; height: 8px; }
+html.dark ::-webkit-scrollbar-track  { background: #0f172a; }
+html.dark ::-webkit-scrollbar-thumb  { background: #334155; border-radius: 4px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ── Imagens com fundo claro (filtro suave no dark) ──────────────────────── */
+html.dark img:not([src*=".svg"]):not([data-no-dim]) {
+    /* Reduz brilho em 10 % para conforto visual sem inverter cores */
+    filter: brightness(0.92) contrast(1.02);
+    transition: filter 0.2s;
+}
+html.dark img:hover:not([src*=".svg"]):not([data-no-dim]) { filter: brightness(1) contrast(1); }
+
+/* ── Transição suave ao trocar tema ──────────────────────────────────────── */
+html { transition: background-color 0.2s ease, color 0.2s ease; }
+*, *::before, *::after { transition: background-color 0.2s ease, border-color 0.2s ease; }
+
+/* ── Fallback para navegadores sem CSS custom properties ─────────────────── */
+@supports not (color: var(--bg)) {
+    body { background: #0f172a; color: #f1f5f9; }
 }

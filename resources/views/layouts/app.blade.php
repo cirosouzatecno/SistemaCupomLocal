@@ -5,24 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Cupons Locais')</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+
+    {{-- ── Anti-FOSC: aplica classe `dark` ANTES do primeiro render ──────── --}}
+    {{-- Fallback inline para navegadores sem suporte a módulos ES              --}}
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50:  '#fff7ed',
-                            100: '#ffeed5',
-                            500: '#f97316',
-                            600: '#ea6c0a',
-                            700: '#c2570a',
-                        }
-                    }
-                }
+        (function () {
+            var k = 'cupons-theme', d = false;
+            try {
+                var s = localStorage.getItem(k);
+                if (s !== null) { d = s === 'dark'; }
+                else { d = window.matchMedia('(prefers-color-scheme: dark)').matches; }
+            } catch (e) {
+                var c = document.cookie.split(';')
+                    .find(function (x) { return x.trim().indexOf(k + '=') === 0; });
+                d = c ? c.split('=')[1].trim() === 'dark'
+                      : window.matchMedia('(prefers-color-scheme: dark)').matches;
             }
-        }
+            if (d) document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+        })();
     </script>
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
 
@@ -76,6 +80,18 @@
                         Cadastrar
                     </a>
                 @endif
+
+                {{-- ── Botão de tema claro/escuro ─────────────────────────── --}}
+                <button
+                    data-theme-toggle
+                    aria-label="Alternar tema"
+                    title="Alternar tema claro/escuro"
+                    class="ml-2 flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium
+                           bg-white/10 hover:bg-white/20 transition focus:outline-none focus:ring-2 focus:ring-white/50"
+                >
+                    <span data-theme-icon aria-hidden="true">🌙</span>
+                    <span data-theme-label class="sr-only">Modo escuro</span>
+                </button>
             </div>
         </div>
     </nav>
