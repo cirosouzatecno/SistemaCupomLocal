@@ -123,5 +123,6 @@
         &copy; {{ date('Y') }} Cupons Locais — Todos os direitos reservados.
     </footer>
 
+    @stack('scripts')
 </body>
 </html>

@@ -72,6 +72,7 @@ Route::prefix('lojista')->name('merchant.')->group(function () {
         Route::get('/cupons',                         [MerchantCouponController::class, 'index'])->name('coupons.index');
         Route::get('/cupons/criar',                   [MerchantCouponController::class, 'create'])->name('coupons.create');
         Route::post('/cupons',                        [MerchantCouponController::class, 'store'])->name('coupons.store');
+        Route::post('/cupons/gerar-imagem-ia',        [MerchantCouponController::class, 'generateAiImage'])->name('coupons.ai-image');
         Route::get('/cupons/{coupon}/editar',         [MerchantCouponController::class, 'edit'])->name('coupons.edit');
         Route::put('/cupons/{coupon}',                [MerchantCouponController::class, 'update'])->name('coupons.update');
         Route::delete('/cupons/{coupon}',             [MerchantCouponController::class, 'destroy'])->name('coupons.destroy');

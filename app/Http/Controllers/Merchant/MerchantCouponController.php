@@ -7,6 +7,7 @@ use App\Models\Coupon;
 use App\Models\UserCoupon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 class MerchantCouponController extends Controller
@@ -54,6 +55,7 @@ class MerchantCouponController extends Controller
             'total_quantity' => 'nullable|integer|min:1',
             'per_user_limit' => 'required|integer|min:1|max:10',
             'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'ai_image_path'  => 'nullable|string|max:512',
             'status'         => 'required|in:active,inactive',
         ], $this->messages());
 
@@ -61,7 +63,14 @@ class MerchantCouponController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('image')) {
+            // Upload manual do formulário
             $imagePath = $request->file('image')->store('coupons', 'public');
+        } elseif ($request->filled('ai_image_path')) {
+            // Imagem já salva pelo endpoint generateAiImage()
+            $candidate = $request->input('ai_image_path');
+            if (str_starts_with($candidate, 'coupons/') && Storage::disk('public')->exists($candidate)) {
+                $imagePath = $candidate;
+            }
         }
 
         Coupon::create([
@@ -115,6 +124,7 @@ class MerchantCouponController extends Controller
             'total_quantity' => 'nullable|integer|min:1',
             'per_user_limit' => 'required|integer|min:1|max:10',
             'image'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'ai_image_path'  => 'nullable|string|max:512',
             'status'         => 'required|in:active,inactive,expired',
         ], $this->messages());
 
@@ -124,6 +134,15 @@ class MerchantCouponController extends Controller
                 Storage::disk('public')->delete($coupon->image_path);
             }
             $data['image_path'] = $request->file('image')->store('coupons', 'public');
+        } elseif ($request->filled('ai_image_path')) {
+            // Imagem já salva pelo endpoint generateAiImage()
+            $candidate = $request->input('ai_image_path');
+            if (str_starts_with($candidate, 'coupons/') && Storage::disk('public')->exists($candidate)) {
+                if ($coupon->image_path && $coupon->image_path !== $candidate) {
+                    Storage::disk('public')->delete($coupon->image_path);
+                }
+                $data['image_path'] = $candidate;
+            }
         }
 
         $coupon->update([
@@ -167,6 +186,229 @@ class MerchantCouponController extends Controller
 
         return redirect()->route('merchant.coupons.index')
             ->with('success', 'Cupom excluído com sucesso.');
+    }
+
+    // ─── Geração de imagem via IA (Stable Horde — gratuito, anônimo) ───────────
+
+    public function generateAiImage(Request $request)
+    {
+        $request->validate([
+            'prompt' => 'required|string|max:500',
+            'title'  => 'nullable|string|max:255',
+        ]);
+
+        // Aumenta tempo limite do PHP para 3 minutos (geração pode levar ~30-60 s)
+        set_time_limit(180);
+
+        $apiBase  = 'https://stablehorde.net/api/v2';
+        $apiKey   = '0000000000'; // chave anônima gratuita
+        $headers  = ['apikey' => $apiKey, 'Accept' => 'application/json'];
+
+        $fullPrompt = $request->input('prompt')
+            . ', vibrant colorful gradient background, modern flat design, no text, no letters, bold shapes, high quality';
+
+        // ── 1. Submete o job ────────────────────────────────────────────────
+        $submitResp = Http::timeout(20)
+            ->withHeaders($headers)
+            ->post("{$apiBase}/generate/async", [
+                'prompt' => $fullPrompt,
+                'params' => ['width' => 512, 'height' => 512, 'steps' => 20, 'n' => 1],
+            ]);
+
+        if (! $submitResp->successful()) {
+            return response()->json([
+                'error' => 'Erro ao enviar pedido de geração: ' . $submitResp->body(),
+            ], 502);
+        }
+
+        $jobId = $submitResp->json('id');
+        if (! $jobId) {
+            return response()->json(['error' => 'ID do job não retornado pela API.'], 502);
+        }
+
+        // ── 2. Aguarda conclusão (poll a cada 4 s, máx 100 s) ────────────────
+        $done = false;
+        for ($i = 0; $i < 25 && ! $done; $i++) {
+            sleep(4);
+            $checkResp = Http::timeout(10)->withHeaders($headers)
+                ->get("{$apiBase}/generate/check/{$jobId}");
+            $done = (bool) $checkResp->json('done');
+        }
+
+        if (! $done) {
+            return response()->json([
+                'error' => 'Tempo limite excedido aguardando geração. Tente novamente.',
+            ], 504);
+        }
+
+        // ── 3. Busca resultado ────────────────────────────────────────────────
+        $statusResp = Http::timeout(15)->withHeaders($headers)
+            ->get("{$apiBase}/generate/status/{$jobId}");
+
+        $imgUrl = $statusResp->json('generations.0.img');
+
+        if (! $imgUrl) {
+            return response()->json(['error' => 'Geração retornou sem imagem.'], 502);
+        }
+
+        // ── 4. Baixa a imagem do Cloudflare R2 e salva no storage ─────────────
+        $imgResp = Http::timeout(30)->get($imgUrl);
+
+        if (! $imgResp->successful()) {
+            return response()->json(['error' => 'Erro ao baixar imagem gerada.'], 502);
+        }
+
+        $ct  = explode(';', $imgResp->header('Content-Type') ?? 'image/webp')[0];
+        $ext = match ($ct) {
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+            default      => 'jpg',
+        };
+
+        $filename = 'coupons/ai-' . uniqid() . '.' . $ext;
+        Storage::disk('public')->put($filename, $imgResp->body());
+
+        // ── 5. Overlays de texto com o título do cupom ────────────────────────
+        $title = trim($request->input('title', ''));
+        if ($title !== '') {
+            $storagePath = storage_path('app/public/' . $filename);
+            $this->addTextOverlay($storagePath, $title, $ext);
+        }
+
+        return response()->json([
+            'path'     => $filename,
+            'imageUrl' => asset('storage/' . $filename),
+        ]);
+    }
+
+    /**
+     * Sobrepõe o título em letras grandes e legíveis sobre a imagem gerada pela IA.
+     * Usa uma faixa semitransparente no rodapé e texto branco centralizado.
+     */
+    private function addTextOverlay(string $path, string $title, string $ext): void
+    {
+        if (! extension_loaded('gd')) {
+            return;
+        }
+
+        // Carrega a imagem conforme o formato
+        $img = match ($ext) {
+            'webp'  => @imagecreatefromwebp($path),
+            'png'   => @imagecreatefrompng($path),
+            default => @imagecreatefromjpeg($path),
+        };
+
+        if (! $img) {
+            return;
+        }
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+
+        // Escolhe fonte mais legível disponível
+        $fontCandidates = [
+            'C:/Windows/Fonts/arialbd.ttf',
+            'C:/Windows/Fonts/calibrib.ttf',
+            'C:/Windows/Fonts/verdanab.ttf',
+            'C:/Windows/Fonts/arial.ttf',
+        ];
+        $font = null;
+        foreach ($fontCandidates as $f) {
+            if (file_exists($f)) { $font = $f; break; }
+        }
+        if (! $font) {
+            imagedestroy($img);
+            return;
+        }
+
+        // ── Quebra o título em linhas que cabem na largura da imagem ─────────
+        $maxFontSize = max(22, (int) ($w * 0.065)); // ~6.5% da largura
+        $minFontSize = 14;
+        $margin      = (int) ($w * 0.05);
+        $maxWidth    = $w - $margin * 2;
+        $maxLines    = 3; // máximo de linhas para não cobrir demais a imagem
+
+        $lines    = [];
+        $fontSize = $maxFontSize;
+
+        // Reduz tamanho até caber em até $maxLines linhas
+        $words    = explode(' ', $title);
+        $attempts = 0;
+
+        while ($fontSize >= $minFontSize && $attempts < 40) {
+            $lines   = [];
+            $current = '';
+
+            foreach ($words as $word) {
+                $test = $current === '' ? $word : $current . ' ' . $word;
+                $box  = imagettfbbox($fontSize, 0, $font, $test);
+                $tw   = abs($box[2] - $box[0]);
+                if ($tw > $maxWidth && $current !== '') {
+                    $lines[]  = $current;
+                    $current  = $word;
+                } else {
+                    $current  = $test;
+                }
+            }
+            if ($current !== '') {
+                $lines[] = $current;
+            }
+
+            // Verifica se cabe em maxLines e todas as linhas respeitam maxWidth
+            $ok = count($lines) <= $maxLines;
+            if ($ok) {
+                foreach ($lines as $line) {
+                    $box = imagettfbbox($fontSize, 0, $font, $line);
+                    if (abs($box[2] - $box[0]) > $maxWidth) { $ok = false; break; }
+                }
+            }
+            if ($ok) break;
+
+            $fontSize -= 2;
+            $attempts++;
+        }
+
+        // ── Altura da faixa de fundo ─────────────────────────────────────────
+        $lineHeight  = (int) ($fontSize * 1.38);
+        $paddingV    = (int) ($fontSize * 0.6);
+        $bannerH     = count($lines) * $lineHeight + $paddingV * 2;
+        // Limita a no máximo 38% da altura da imagem
+        $bannerH     = min($bannerH, (int) ($h * 0.38));
+        $bannerY     = $h - $bannerH;
+
+        // ── Faixa semitransparente desenhada via blending direto ─────────────
+        imagealphablending($img, true);
+        $darkBar = imagecolorallocatealpha($img, 15, 15, 25, 55); // ~57% opacidade
+        imagefilledrectangle($img, 0, $bannerY, $w - 1, $h - 1, $darkBar);
+
+        // ── Escreve cada linha centralizada ──────────────────────────────────
+        $white  = imagecolorallocate($img, 255, 255, 255);
+        $shadow = imagecolorallocatealpha($img, 0, 0, 0, 70);
+
+        $startY = $bannerY + $paddingV;
+
+        foreach ($lines as $line) {
+            $box    = imagettfbbox($fontSize, 0, $font, $line);
+            $tw     = abs($box[2] - $box[0]);
+            $x      = (int) (($w - $tw) / 2);
+            $y      = $startY + $fontSize;
+
+            // Sombra
+            imagettftext($img, $fontSize, 0, $x + 2, $y + 2, $shadow, $font, $line);
+            // Texto branco
+            imagettftext($img, $fontSize, 0, $x, $y, $white, $font, $line);
+
+            $startY += $lineHeight;
+        }
+
+        // ── Salva de volta no mesmo arquivo ──────────────────────────────────
+        match ($ext) {
+            'webp'  => imagewebp($img, $path, 90),
+            'png'   => imagepng($img, $path),
+            default => imagejpeg($img, $path, 90),
+        };
+
+        imagedestroy($img);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
