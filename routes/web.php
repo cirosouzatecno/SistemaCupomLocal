@@ -13,6 +13,7 @@ use App\Http\Controllers\Merchant\CouponValidationController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminMerchantController;
 use App\Http\Controllers\Admin\AdminStatsController;
+use App\Http\Controllers\Admin\ThemeDemoController;
 use App\Http\Controllers\PublicController;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -115,4 +116,23 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // ── Estatísticas (Etapa 7) ───────────────────────────────────
         Route::get('/estatisticas', [AdminStatsController::class, 'index'])->name('stats');
     });
+});
+
+// ======================================================================
+// TEMA DEMO (ADMIN)
+// ======================================================================
+Route::prefix('admin/tema')->middleware('auth:admin')->name('admin.theme.')->group(function () {
+    Route::get('/', [ThemeDemoController::class, 'home'])->name('home');
+    Route::get('/login', [ThemeDemoController::class, 'login'])->name('login');
+    Route::get('/registro', [ThemeDemoController::class, 'register'])->name('register');
+    Route::get('/recuperar', [ThemeDemoController::class, 'forgot'])->name('forgot');
+    Route::get('/dashboard', [ThemeDemoController::class, 'dashboard'])->name('dashboard');
+    Route::get('/itens', [ThemeDemoController::class, 'items'])->name('items');
+    Route::get('/formularios', [ThemeDemoController::class, 'forms'])->name('forms');
+    Route::get('/perfil', [ThemeDemoController::class, 'profile'])->name('profile');
+    Route::get('/admin', [ThemeDemoController::class, 'adminTable'])->name('admin-table');
+    Route::get('/erros/404', [ThemeDemoController::class, 'error404'])->name('error-404');
+    Route::get('/erros/500', [ThemeDemoController::class, 'error500'])->name('error-500');
+    Route::get('/vazio', [ThemeDemoController::class, 'emptyState'])->name('empty');
+    Route::get('/mobile', [ThemeDemoController::class, 'mobile'])->name('mobile');
 });
